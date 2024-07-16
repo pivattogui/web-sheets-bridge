@@ -4,43 +4,72 @@ import { eventErrorHandler, getQuestionsWithFields } from './util';
 import { getGoogleSheet } from './googlesheets';
 import moment from 'moment';
 import { v4 as uuidv4 } from 'uuid'
+import { baseLogger } from './logger';
+
+const logger = baseLogger.child({ service: "webhook" }, { level: "debug" })
 
 export const handler = async (event: APIGatewayEvent, context: Context): Promise<APIGatewayProxyResult> => {
-    const error = eventErrorHandler(event);
+    try {
+        logger.debug({ event }, 'Received event');
 
-    if (error) return error;
+        const error = eventErrorHandler(event);
 
-    const payload: PayloadEvent = JSON.parse(event.body || '{}');
-    const docId = event.headers['doc_id'] as string
+        if (!!error) {
+            logger.error({ error }, 'Error in event');
+            return error;
+        }
 
-    const questionsWithFields = getQuestionsWithFields(payload)
+        const payload: PayloadEvent = JSON.parse(event.body || '{}');
+        const docId = event.headers['doc_id'] as string
 
-    const doc = await getGoogleSheet(docId)
+        logger.debug({ payload, docId }, 'Received payload');
 
-    await doc.loadInfo()
+        const questionsWithFields = getQuestionsWithFields(payload)
 
-    const sheet = doc.sheetsByIndex[0];
-    await sheet.loadHeaderRow()
+        const doc = await getGoogleSheet(docId)
 
-    const headerValues = sheet.headerValues
+        await doc.loadInfo()
 
-    for (const question of questionsWithFields) {
-        const row = headerValues.reduce((acc, header) => {
-            acc[header] = question[header] || getDefaultValues(header)
+        logger.debug({ doc }, 'Loaded doc');
 
+        const sheet = doc.sheetsByIndex[0];
+        await sheet.loadHeaderRow()
 
-            return acc
-        }, {} as Record<string, string>)
+        logger.debug({ sheet }, 'Loaded sheet');
 
-        await sheet.addRow(row)
+        const headerValues = sheet.headerValues
+
+        logger.debug({ headerValues }, 'Loaded headerValues');
+
+        for (const question of questionsWithFields) {
+            const row = headerValues.reduce((acc, header) => {
+                acc[header] = question[header] || getDefaultValues(header)
+
+                return acc
+            }, {} as Record<string, string>)
+
+            await sheet.addRow(row)
+            logger.debug({ row }, 'Added row');
+        }
+
+        logger.debug('Success');
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                message: 'Success'
+            }),
+        };
+    } catch (error) {
+        logger.error({ error }, 'Error');
+        return {
+            statusCode: 500,
+            body: JSON.stringify({
+                message: error
+            }),
+        };
+
     }
-
-    return {
-        statusCode: 200,
-        body: JSON.stringify({
-            message: 'Success'
-        }),
-    };
 };
 
 const getDefaultValues = (header: string) => {
@@ -49,6 +78,8 @@ const getDefaultValues = (header: string) => {
             return uuidv4()
         case 'data':
             return moment().format('DD/MM/YYYY')
+        case 'data_hora':
+            return moment().format('DD/MM/YYYY HH:mm:ss')
         default:
             return '-'
     }
