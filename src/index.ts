@@ -1,5 +1,4 @@
 import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda';
-import { PayloadEvent } from './types';
 import { eventErrorHandler, getQuestionsWithFields } from './util';
 import { getGoogleSheet } from './googlesheets';
 import moment from 'moment';
@@ -19,7 +18,7 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
             return error;
         }
 
-        const payload: PayloadEvent = JSON.parse(event.body || '{}');
+        const payload: any = JSON.parse(event.body || '{}');
         const docId = event.headers['doc_id'] as string
 
         logger.debug({ payload, docId }, 'Received payload');
@@ -32,7 +31,12 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
 
         logger.debug({ doc }, 'Loaded doc');
 
-        const sheet = doc.sheetsByIndex[0];
+        const sheetTitle = event.headers['sheet']
+
+        let sheet = !!sheetTitle ? doc.sheetsByTitle[sheetTitle] : doc.sheetsByIndex[0]
+
+        if (!sheet) sheet = doc.sheetsByIndex[0]
+
         await sheet.loadHeaderRow()
 
         logger.debug({ sheet }, 'Loaded sheet');

@@ -1,5 +1,4 @@
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { PayloadEvent } from './types';
 
 export const eventErrorHandler = (event: APIGatewayEvent): APIGatewayProxyResult | null => {
     if (event.httpMethod !== 'POST') return {
@@ -16,24 +15,15 @@ export const eventErrorHandler = (event: APIGatewayEvent): APIGatewayProxyResult
         }),
     };
 
-    const payload: PayloadEvent = JSON.parse(event.body || '{}');
-
-    if (!payload?.perguntas || !Array.isArray(payload.perguntas)) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify({
-                message: 'O campo "perguntas" é obrigatório e deve ser um array.',
-            }),
-        };
-    }
-
     return null
 }
 
-export const getQuestionsWithFields = (payload: PayloadEvent): any[] => {
+export const getQuestionsWithFields = (payload: any): any[] => {
     const { perguntas, ...fields } = payload;
 
-    return perguntas.map(question => ({
+    if (!perguntas?.length) return [fields];
+
+    return perguntas.map((question: any) => ({
         ...fields,
         ...question
     }));
