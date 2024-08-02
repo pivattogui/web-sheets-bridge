@@ -45,16 +45,19 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
 
         logger.debug({ headerValues }, 'Loaded headerValues');
 
+        const rows = []
         for (const question of questionsWithFields) {
             const row = headerValues.reduce((acc, header) => {
-                acc[header] = question[header] || getDefaultValues(header)
+                acc[header] = question[header] ?? getDefaultValues(header)
 
                 return acc
             }, {} as Record<string, string>)
 
-            await sheet.addRow(row)
-            logger.debug({ row }, 'Added row');
+            rows.push(row)
         }
+
+        await sheet.addRows(rows)
+        logger.debug({ rows }, 'Added row');
 
         logger.debug('Success');
 
