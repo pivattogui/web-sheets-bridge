@@ -5,6 +5,7 @@ import moment from 'moment';
 import { v4 as uuidv4 } from 'uuid'
 import { baseLogger } from './logger';
 import { retry } from './retry';
+import { GoogleSpreadsheet } from 'google-spreadsheet';
 
 const logger = baseLogger.child({ service: "webhook" }, { level: "debug" })
 
@@ -26,7 +27,14 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
 
         const questionsWithFields = getQuestionsWithFields(payload)
 
-        const doc = await getGoogleSheet(docId)
+        const doc: GoogleSpreadsheet = await getGoogleSheet(docId)
+
+        if (!doc) return {
+            statusCode: 500,
+            body: JSON.stringify({
+                message: 'Error loading doc'
+            }),
+        }
 
         await doc.loadInfo()
 
@@ -48,7 +56,7 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
 
         const rows: any[] = []
         for (const question of questionsWithFields) {
-            const row = headerValues.reduce((acc, header) => {
+            const row = headerValues.reduce((acc: any, header: string) => {
                 acc[header] = question[header] ?? getDefaultValues(header)
 
                 return acc
@@ -57,7 +65,7 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
             rows.push(row)
         }
 
-        await retry(() => sheet.addRows(rows), 10, 5000)
+        await sheet.addRows(rows)
 
         logger.debug({ rows }, 'Added row');
 
