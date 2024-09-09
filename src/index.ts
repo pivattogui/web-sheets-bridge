@@ -4,6 +4,7 @@ import { getGoogleSheet } from './googlesheets';
 import moment from 'moment';
 import { v4 as uuidv4 } from 'uuid'
 import { baseLogger } from './logger';
+import { retry } from './retry';
 
 const logger = baseLogger.child({ service: "webhook" }, { level: "debug" })
 
@@ -45,7 +46,7 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
 
         logger.debug({ headerValues }, 'Loaded headerValues');
 
-        const rows = []
+        const rows: any[] = []
         for (const question of questionsWithFields) {
             const row = headerValues.reduce((acc, header) => {
                 acc[header] = question[header] ?? getDefaultValues(header)
@@ -56,7 +57,8 @@ export const handler = async (event: APIGatewayEvent, context: Context): Promise
             rows.push(row)
         }
 
-        await sheet.addRows(rows)
+        await retry(() => sheet.addRows(rows), 10, 5000)
+
         logger.debug({ rows }, 'Added row');
 
         logger.debug('Success');
